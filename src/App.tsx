@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, createContext, useContext } from "react";
+
+const ResponsiveCtx = createContext({ isMobile: false, isTablet: false });
 
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 
@@ -22,8 +24,8 @@ const C = {
   shadow: "rgba(42,32,16,0.06)",
 };
 
-const font = "'Georgia','Times New Roman',serif";
-const sans = "'Helvetica Neue','Arial',sans-serif";
+const font = "'Lora','Georgia',serif";
+const sans = "'Inter','Helvetica Neue',sans-serif";
 const CHAT_STORAGE_KEY = "impactstudio_chat_state_v1";
 
 interface ReviewResult {
@@ -355,6 +357,7 @@ function Stars({ n, max = 5 }: { n: number; max?: number }) {
 }
 
 function ReviewResultCard({ r }: { r: ReviewResult }) {
+  const { isMobile } = useContext(ResponsiveCtx);
   const yes = r.verdict === "Yes";
   return (
     <div
@@ -433,7 +436,7 @@ function ReviewResultCard({ r }: { r: ReviewResult }) {
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr" }}>
         <div
           style={{
             padding: "20px 28px",
@@ -1201,7 +1204,7 @@ function ConnectionBanner({ apiUrl }: { apiUrl: string }) {
       </span>
       {details && (
         <span style={{ color: C.inkMuted, fontSize: 12 }}>
-          &mdash; {details}
+          {details}
         </span>
       )}
     </div>
@@ -1223,8 +1226,20 @@ export default function App() {
     Array<{ role: string; content: string }>
   >(initialSaved.chatHistory);
   const [hydrated, setHydrated] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const isMobile = windowWidth < 600;
+  const isTablet = windowWidth >= 600 && windowWidth < 900;
+  const isDesktop = windowWidth >= 900;
+
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     setHydrated(true);
@@ -1343,6 +1358,7 @@ export default function App() {
   };
 
   return (
+    <ResponsiveCtx.Provider value={{ isMobile, isTablet }}>
     <div
       style={{
         display: "flex",
@@ -1350,8 +1366,22 @@ export default function App() {
         background: C.bg,
         fontFamily: sans,
         color: C.ink,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {/* Overlay backdrop for mobile/tablet sidebar */}
+      {!isDesktop && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.35)",
+            zIndex: 199,
+          }}
+        />
+      )}
       <div
         style={{
           width: 272,
@@ -1361,6 +1391,16 @@ export default function App() {
           display: "flex",
           flexDirection: "column" as const,
           padding: "24px 20px",
+          ...(isDesktop ? {} : {
+            position: "fixed" as const,
+            top: 0,
+            left: 0,
+            height: "100vh",
+            zIndex: 200,
+            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.25s ease",
+            boxShadow: sidebarOpen ? "4px 0 24px rgba(0,0,0,0.15)" : "none",
+          }),
         }}
       >
         <Logo />
@@ -1370,59 +1410,60 @@ export default function App() {
             onClick={reset}
             style={{
               width: "100%",
-              padding: "11px 16px",
+              padding: "13px 18px",
               borderRadius: 10,
-              border: `1px solid ${C.border}`,
-              background: C.card,
-              color: C.ink,
-              fontSize: 13.5,
+              border: "none",
+              background: `linear-gradient(135deg, ${C.accent}, ${C.accentGlow})`,
+              color: "#fff",
+              fontSize: 14,
               fontWeight: 600,
               cursor: "pointer",
               fontFamily: sans,
               textAlign: "left" as const,
-              boxShadow: `0 1px 3px ${C.shadow}`,
+              boxShadow: `0 3px 10px ${C.accent}33`,
+              letterSpacing: 0.1,
             }}
           >
             + New Review
           </button>
-          <button
-            onClick={clearSavedHistory}
-            style={{
-              width: "100%",
-              marginTop: 8,
-              padding: "10px 16px",
-              borderRadius: 10,
-              border: `1px solid ${C.border}`,
-              background: C.bgWarm,
-              color: C.inkSoft,
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: sans,
-              textAlign: "left" as const,
-            }}
-          >
-            Clear Saved History
-          </button>
-          <button
-            onClick={downloadHistory}
-            style={{
-              width: "100%",
-              marginTop: 8,
-              padding: "10px 16px",
-              borderRadius: 10,
-              border: `1px solid ${C.border}`,
-              background: C.card,
-              color: C.inkSoft,
-              fontSize: 12.5,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: sans,
-              textAlign: "left" as const,
-            }}
-          >
-            Download History
-          </button>
+          <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+            <button
+              onClick={clearSavedHistory}
+              style={{
+                flex: 1,
+                padding: "9px 12px",
+                borderRadius: 9,
+                border: `1px solid ${C.border}`,
+                background: C.bgWarm,
+                color: C.inkSoft,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: sans,
+                textAlign: "center" as const,
+              }}
+            >
+              Clear
+            </button>
+            <button
+              onClick={downloadHistory}
+              style={{
+                flex: 1,
+                padding: "9px 12px",
+                borderRadius: 9,
+                border: `1px solid ${C.border}`,
+                background: C.card,
+                color: C.inkSoft,
+                fontSize: 12,
+                fontWeight: 500,
+                cursor: "pointer",
+                fontFamily: sans,
+                textAlign: "center" as const,
+              }}
+            >
+              Export
+            </button>
+          </div>
         </div>
 
         <div style={{ marginTop: 28 }}>
@@ -1502,110 +1543,153 @@ export default function App() {
 
         <div
           style={{
-            padding: "12px 28px",
+            padding: isMobile ? "10px 14px" : "12px 28px",
             borderBottom: `1px solid ${C.border}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             background: C.card,
+            gap: 10,
           }}
         >
-          <span
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: sans,
-              color: C.ink,
-            }}
-          >
-            Creative Analysis Console
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            {!isDesktop && (
+              <button
+                onClick={() => setSidebarOpen((v) => !v)}
+                style={{
+                  background: "none",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: "6px 10px",
+                  cursor: "pointer",
+                  fontSize: 16,
+                  color: C.inkSoft,
+                  lineHeight: 1,
+                  flexShrink: 0,
+                }}
+              >
+                ☰
+              </button>
+            )}
+            <span
+              style={{
+                fontSize: isMobile ? 15 : 17,
+                fontWeight: 600,
+                fontFamily: font,
+                color: C.ink,
+                letterSpacing: -0.2,
+              }}
+            >
+              {isMobile ? "Analysis Console" : "Creative Analysis Console"}
+            </span>
+          </div>
           <StageIndicator stage={stage} agent={agent} />
         </div>
 
         <div
           ref={chatRef}
-          style={{ flex: 1, overflow: "auto", padding: "28px 36px" }}
+          style={{
+            flex: 1,
+            overflow: "auto",
+            padding: isMobile ? "16px 14px" : isTablet ? "20px 20px" : "28px 36px",
+          }}
         >
           {messages.length === 0 && !running && (
-            <div style={{ textAlign: "center" as const, marginTop: 100 }}>
-              <div
-                style={{
-                  width: 72,
-                  height: 72,
-                  borderRadius: 18,
-                  margin: "0 auto 20px",
-                  background: `linear-gradient(135deg, ${C.accent}18, ${C.gold}18)`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 32,
-                  color: C.accent,
-                }}
-              >
-                &#9671;
+            <div style={{ marginTop: isMobile ? 32 : 80, maxWidth: 680, margin: `${isMobile ? 32 : 80}px auto 0` }}>
+              <div style={{ marginBottom: 36, paddingLeft: 4 }}>
+                <h2
+                  style={{
+                    fontSize: isMobile ? 22 : 28,
+                    fontFamily: font,
+                    fontWeight: 700,
+                    color: C.ink,
+                    margin: "0 0 10px",
+                    letterSpacing: -0.3,
+                    lineHeight: 1.2,
+                  }}
+                >
+                  What are you working on?
+                </h2>
+                <p
+                  style={{
+                    fontSize: 15,
+                    color: C.inkMuted,
+                    margin: 0,
+                    lineHeight: 1.65,
+                    fontFamily: sans,
+                    fontWeight: 400,
+                  }}
+                >
+                  Upload a script or paste text below, or start with a prompt.
+                </p>
               </div>
-              <h2
-                style={{
-                  fontSize: 24,
-                  fontFamily: font,
-                  fontWeight: 700,
-                  color: C.ink,
-                  margin: "0 0 8px",
-                }}
-              >
-                What script are you reviewing?
-              </h2>
-              <p
-                style={{
-                  fontSize: 15,
-                  color: C.inkMuted,
-                  maxWidth: 440,
-                  margin: "0 auto",
-                  lineHeight: 1.6,
-                  fontFamily: sans,
-                }}
-              >
-                Upload a script or paste text, then ask for a concise review.
-              </p>
               <div
                 style={{
                   display: "flex",
-                  gap: 10,
-                  justifyContent: "center",
-                  marginTop: 28,
-                  flexWrap: "wrap" as const,
+                  gap: 14,
+                  flexDirection: isMobile ? "column" as const : "row" as const,
                 }}
               >
                 {[
                   {
-                    text: "Review this screenplay for uplifting value",
+                    text: "Review this script for uplifting value",
+                    sub: "Evaluates tone, values, and social impact",
                     icon: "✦",
+                    accent: C.accent,
+                    accentSoft: "#FDF0ED",
                   },
                   {
-                    text: "Review the structure and emotional clarity of my script",
+                    text: "Analyze the community impact of this story",
+                    sub: "Maps affected communities and outreach actions",
                     icon: "◇",
+                    accent: C.teal,
+                    accentSoft: C.tealSoft,
                   },
                 ].map((ex, i) => (
                   <button
                     key={i}
                     onClick={() => setInput(ex.text)}
                     style={{
-                      padding: "10px 18px",
-                      borderRadius: 10,
+                      flex: 1,
+                      padding: "20px 22px",
+                      borderRadius: 14,
                       border: `1px solid ${C.border}`,
                       background: C.card,
-                      color: C.inkSoft,
-                      fontSize: 13.5,
                       cursor: "pointer",
                       fontFamily: sans,
                       display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      boxShadow: `0 1px 3px ${C.shadow}`,
+                      flexDirection: "column" as const,
+                      alignItems: "flex-start",
+                      gap: 10,
+                      boxShadow: `0 2px 8px ${C.shadow}`,
+                      textAlign: "left" as const,
+                      transition: "border-color 0.15s",
                     }}
                   >
-                    <span>{ex.icon}</span> {ex.text}
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 9,
+                        background: ex.accentSoft,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 15,
+                        color: ex.accent,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {ex.icon}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14.5, fontWeight: 600, color: C.ink, lineHeight: 1.4, marginBottom: 5 }}>
+                        {ex.text}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: C.inkMuted, lineHeight: 1.5, fontWeight: 400 }}>
+                        {ex.sub}
+                      </div>
+                    </div>
                   </button>
                 ))}
               </div>
@@ -1625,7 +1709,7 @@ export default function App() {
                 >
                   <div
                     style={{
-                      maxWidth: 520,
+                      maxWidth: isMobile ? "100%" : 520,
                       padding: "14px 18px",
                       borderRadius: "16px 16px 4px 16px",
                       background: C.accent,
@@ -1643,7 +1727,7 @@ export default function App() {
             }
             const d = m.data;
             return (
-              <div key={i} style={{ marginBottom: 24, maxWidth: 660 }}>
+              <div key={i} style={{ marginBottom: 24, maxWidth: isMobile ? "100%" : isTablet ? "90%" : 660 }}>
                 {d.type === "review" && (
                   <>
                     <ReviewResultCard r={d} />
@@ -1689,7 +1773,7 @@ export default function App() {
 
         <div
           style={{
-            padding: "16px 28px",
+            padding: isMobile ? "12px 14px" : "16px 28px",
             borderTop: `1px solid ${C.border}`,
             background: C.card,
           }}
@@ -1816,5 +1900,6 @@ export default function App() {
         </div>
       </div>
     </div>
+    </ResponsiveCtx.Provider>
   );
 }
